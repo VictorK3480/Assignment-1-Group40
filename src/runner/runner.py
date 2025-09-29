@@ -1,43 +1,162 @@
-from pathlib import Path
-from typing import Dict, List
+from src.data_ops.data_loader import DataLoader1a, DataLoader1b
+from src.opt_model.opt_model import OptimizationModel1a, OptimizationModel1b
+
+# Base run 
+def run_optimization_1a(scenario=None):
+    loader = DataLoader1a()
+    DER_prod = loader.load_der_production()
+    app_params = loader.load_appliance_params()
+    bus_params = loader.load_bus_params()
+    usage = loader.load_usage_preferences()
+
+    hours = range(len(DER_prod))
+    PV_capacity = app_params["DER"][0]["max_power_kW"]
+    pv = {i: PV_capacity * DER_prod[i] for i in hours}
+    b_list = bus_params["energy_price_DKK_per_kWh"]
+    s_list = b_list.copy()  # start with parity
+
+    GI = bus_params["import_tariff_DKK/kWh"]
+    GE = bus_params["export_tariff_DKK/kWh"]   # stays at base value here
+    D = usage["load_preferences"][0]["min_total_energy_per_day_hour_equivalent"]
+
+    # You can still allow scenario tweaks if you want
+    if scenario:
+        if "GI" in scenario: GI = scenario["GI"]
+        if "GE" in scenario: GE = scenario["GE"]
+
+    params = {
+        "hours": hours,
+        "pv": pv,
+        "b": {i: b_list[i] for i in hours},
+        "s": {i: s_list[i] for i in hours},
+        "GI": GI,
+        "GE": GE,
+        "D": D,
+    }
+
+    opt = OptimizationModel1a(params)
+    opt.run()
+    return opt.results
 
 
-class Runner:
-    """
-    Handles configuration setting, data loading and preparation, model(s) execution, results saving and ploting
-    """
+# Export tariff sweep 
+def run_export_tariff_sweep(start=0.0, stop=2.6, step=0.1):
+    loader = DataLoader1a()
+    DER_prod = loader.load_der_production()
+    app_params = loader.load_appliance_params()
+    bus_params = loader.load_bus_params()
+    usage = loader.load_usage_preferences()
 
-    def __init__(self) -> None:
-        """Initialize the Runner."""
+    hours = range(len(DER_prod))
+    PV_capacity = app_params["DER"][0]["max_power_kW"]
+    pv = {i: PV_capacity * DER_prod[i] for i in hours}
+    b_list = bus_params["energy_price_DKK_per_kWh"]
+    s_list = b_list.copy()
+    GI = bus_params["import_tariff_DKK/kWh"]
+    D = usage["load_preferences"][0]["min_total_energy_per_day_hour_equivalent"]
 
-    def _load_config(self) -> None:
-        """Load configuration (placeholder method)"""
-    # Extract simulation configuration and hyperparameter values (e.g. question, scenarios for sensitivity analysis, duration of simulation, solver name, etc.) and store them as class attributes (e.g. self.scenario_list, self.solver_name, etc.)
-    
-    def _create_directories(self) -> None:
-        """Create required directories for each simulation configuration. (placeholder method)"""
+    results_all = []
 
-    def prepare_data_single_simulation(self, question_name) -> None:
-        """Prepare input data for a single simulation (placeholder method)"""
-        # Prepare input data using DataProcessor for a given simulation configuration and store it as class attributes (e.g. self.data)
+    ge = start
+    while ge <= stop + 1e-9:  # safeguard
+        params = {
+            "hours": hours,
+            "pv": pv,
+            "b": {i: b_list[i] for i in hours},
+            "s": {i: s_list[i] for i in hours},
+            "GI": GI,
+            "GE": ge,
+            "D": D,
+        }
+        model = OptimizationModel1a(params)
+        model.run()
+        res = model.results.copy()   # <- copy!
+        res["GE"] = round(ge, 2)
+        results_all.append(res)
+        ge += step
 
-    def prepare_data_all_simulations(self) -> None:
-        """Prepare input data for multiple scenarios/sensitivity analysis/questions (placeholder method)"""
-        # Extend data_loader to handle multiple scenarios/questions
-        # Prepare data using data_loader for multiple scenarios/questions
-        
-    def run_single_simulation(self,Args) -> None:
-        """
-        Run a single simulation for a given question and simulation path (placeholder method).
+    return results_all
 
-        Args (examples):
-            question: The question name for the simulation
-            simulation_path: The path to the simulation data
+def run_buying_price_sweep():
+    loader = DataLoader1a()
+    DER_prod = loader.load_der_production()
+    app_params = loader.load_appliance_params()
+    bus_params = loader.load_bus_params()
+    usage = loader.load_usage_preferences()
 
-        """
-        # Initialize Optimization Model for the given question and simulation path
-        # Run the model
-        pass
-    def run_all_simulations(self) -> None:
-        """Run all simulations for the configured scenarios (placeholder method)."""
-        pass
+    # Parameters
+    hours = range(len(DER_prod))
+    PV_capacity = app_params["DER"][0]["max_power_kW"]
+    pv = {i: PV_capacity * DER_prod[i] for i in hours}
+    s = {i: bus_params["energy_price_DKK_per_kWh"][i] for i in hours}  # selling price
+    GE = bus_params["export_tariff_DKK/kWh"]
+    GI = bus_params["import_tariff_DKK/kWh"]
+    D = usage["load_preferences"][0]["min_total_energy_per_day_hour_equivalent"]
+
+    # Sweep factors [0, 0.1, ..., 1.0]
+    factors = [i / 10 for i in range(11)]
+    results_all = []
+
+    for f in factors:
+        b = {i: f * s[i] for i in hours}  # buying price is factor * selling price
+
+        params = {
+            "hours": hours,
+            "pv": pv,
+            "b": b,
+            "s": s,
+            "GE": GE,
+            "GI": GI,
+            "D": D,
+        }
+
+        opt = OptimizationModel1a(params)
+        opt.run()
+
+        res = opt.results.copy()     # <- copy!
+        res["factor"] = f
+        results_all.append(res)
+
+        for r in results_all:
+            print(f"factor={r['factor']}, objective={r.get('objective')}, status={r.get('status','ok')}")
+
+    return results_all
+
+
+def run_optimization_1b(lambda_discomfort=1.0):
+    """Run Question 1b model (flexible load with discomfort)."""
+    loader = DataLoader1b()
+    DER_prod = loader.load_der_production()
+    app_params = loader.load_appliance_params()
+    bus_params = loader.load_bus_params()
+    usage = loader.load_usage_preferences()
+
+    hours = range(len(DER_prod))
+    PV_capacity = app_params["DER"][0]["max_power_kW"]
+    pv = {i: PV_capacity * DER_prod[i] for i in hours}
+
+    b = {i: bus_params["energy_price_DKK_per_kWh"][i] for i in hours}
+    s = b.copy()
+    GI = bus_params["import_tariff_DKK/kWh"]
+    GE = bus_params["export_tariff_DKK/kWh"]
+
+    ratios = usage["load_preferences"][0]["hourly_profile_ratio"]
+    d_hour = app_params["load"][0]["max_load_kWh_per_hour"]
+    ref_load = {i: d_hour * ratios[i] for i in hours}
+
+    params = {
+        "hours": hours,
+        "pv": pv,
+        "b": b,
+        "s": s,
+        "GE": GE,
+        "GI": GI,
+        "ref_load": ref_load,
+        "d_hour": d_hour,
+        "lambda_discomfort": lambda_discomfort,
+    }
+
+    opt = OptimizationModel1b(params)
+    opt.run()
+    return opt.results
+

@@ -327,6 +327,147 @@ class OptimizationModel1c:
         self.results["dual_soc_init"] = get("SOC_init").Pi if get("SOC_init") else None
         self.results["dual_soc_final"] = get("SOC_final").Pi if get("SOC_final") else None
 
+class OptimizationModel2b:
+    """Flexible load + option of battery (2b): maximize profit - λ*deviation with storage dynamics."""
+
+    def __init__(self, params: Dict[str, Any]):
+        self.params = params
+        self.model = gp.Model("Optimization2b")
+        self.model.Params.LogToConsole = 0
+        self.results: Dict[str, Any] = {}
+        self._built = False
+
+    def build_model(self) -> None:
+        hours = self.params["hours"]
+        pv = self.params["pv"]
+        b = self.params["b"]
+        s = self.params["s"]
+        GE = self.params["GE"]
+        GI = self.params["GI"]
+        ref_load = self.params["ref_load"]
+        d_hour = self.params["d_hour"]
+        lam = self.params["lambda_discomfort"]
+
+        # Battery params (normalize: storage and prefs may be lists)
+        storage = (self.params["storage"][0] if isinstance(self.params["storage"], list) else self.params["storage"])
+        prefs = (
+            self.params["storage_preferences"][0]
+            if isinstance(self.params["storage_preferences"], list)
+            else self.params["storage_preferences"]
+        )
+
+        cap = storage["storage_capacity_kWh"]
+        eta_c = storage["charging_efficiency"]
+        eta_d = storage["discharging_efficiency"]
+        p_ch_max = storage["max_charging_power_ratio"] * cap
+        p_dis_max = storage["max_discharging_power_ratio"] * cap
+        soc_init = prefs["initial_soc_ratio"] * cap
+        soc_final = prefs["final_soc_ratio"] * cap
+
+        # Decision variables
+        self.x = self.model.addVars(hours, name="x", lb=0)                  # PV used
+        self.y = self.model.addVars(hours, name="y", lb=0)                  # import
+        self.z = self.model.addVars(hours, name="z", lb=0)                  # export
+        self.served = self.model.addVars(hours, name="served", lb=0, ub=d_hour)
+        self.u = self.model.addVars(hours, name="u", lb=0)                  # deviation
+        self.l = self.model.addVars(hours, name="l", lb=0)                  # explicit flexible (kept for API)
+
+        # Battery variables
+        self.charge = self.model.addVars(hours, name="charge", lb=0, ub=p_ch_max)
+        self.discharge = self.model.addVars(hours, name="discharge", lb=0, ub=p_dis_max)
+        self.soc = self.model.addVars(hours, name="soc", lb=0, ub=cap)
+
+        # PV cap
+        self.model.addConstrs((self.x[i] <= pv[i] for i in hours), name="PVcap")
+
+        # Energy balance: served = PV + import + discharge - export - charge
+        self.model.addConstrs(
+            (self.served[i] == self.x[i] + self.y[i] + self.discharge[i] - self.z[i] - self.charge[i] for i in hours),
+            name="Balance",
+        )
+
+        # Deviation definition
+        self.model.addConstrs((self.u[i] >= self.served[i] - ref_load[i] for i in hours), name="Dev_pos")
+        self.model.addConstrs((self.u[i] >= ref_load[i] - self.served[i] for i in hours), name="Dev_neg")
+
+        # SOC dynamics
+        self.model.addConstr(
+            self.soc[0] == soc_init + eta_c * self.charge[0] - (1 / eta_d) * self.discharge[0],
+            name="SOC_init",
+        )
+        self.model.addConstrs(
+            (
+                self.soc[i] == self.soc[i - 1] + eta_c * self.charge[i] - (1 / eta_d) * self.discharge[i]
+                for i in hours
+                if i > 0
+            ),
+            name="SOC_dyn",
+        )
+        self.model.addConstr(self.soc[max(hours)] == soc_final, name="SOC_final")  # final SOC
+
+        # Maximize profit minus discomfort
+        self.model.setObjective(
+            gp.quicksum(
+                self.z[i] * (s[i] - GE) - self.y[i] * (b[i] + GI) - lam * self.u[i]  # rev - cost - discomfort
+                for i in hours
+            ),
+            GRB.MAXIMIZE,
+        )
+
+        self._built = True
+
+    def run(self) -> None:
+        if not self._built:
+            self.build_model()
+        self.model.optimize()
+        self.results["status"] = int(self.model.status)
+        if self.model.status == GRB.OPTIMAL:
+            self._save_results()
+
+    def _save_results(self) -> None:
+        hours = self.params["hours"]
+
+        import_cost = sum(self.y[i].X * (self.params["b"][i] + self.params["GI"]) for i in hours)
+        export_rev = sum(self.z[i].X * (self.params["s"][i] - self.params["GE"]) for i in hours)
+        discomfort = sum(self.params["lambda_discomfort"] * self.u[i].X for i in hours)
+
+        self.results["objective"] = float(self.model.ObjVal)
+        self.results["import_cost"] = import_cost
+        self.results["export_revenue"] = export_rev
+        self.results["discomfort_penalty"] = discomfort
+        self.results["net_profit"] = export_rev - import_cost - discomfort
+
+        # Hourly primals
+        self.results["import"] = {i: self.y[i].X for i in hours}
+        self.results["export"] = {i: self.z[i].X for i in hours}
+        self.results["pv"] = {i: self.x[i].X for i in hours}
+        self.results["served"] = {i: self.served[i].X for i in hours}
+        self.results["deviation"] = {i: self.u[i].X for i in hours}
+        self.results["reference_load"] = {i: self.params["ref_load"][i] for i in hours}
+
+        # Battery details
+        self.results["charge"] = {i: self.charge[i].X for i in hours}
+        self.results["discharge"] = {i: self.discharge[i].X for i in hours}
+        self.results["soc"] = {i: self.soc[i].X for i in hours}
+
+        # Totals
+        self.results["total_import"] = sum(self.results["import"].values())
+        self.results["total_export"] = sum(self.results["export"].values())
+        self.results["total_served"] = sum(self.results["served"].values())
+        self.results["total_deviation"] = sum(self.results["deviation"].values())
+        self.results["total_charge"] = sum(self.results["charge"].values())
+        self.results["total_discharge"] = sum(self.results["discharge"].values())
+
+        # Self-consumption: PV used to serve load (bounded by each)
+        self.results["self_consumption"] = sum(min(self.results["pv"][i], self.results["served"][i]) for i in hours)
+
+        # Duals
+        get = self.model.getConstrByName
+        self.results["dual_pv_cap"] = {i: get(f"PVcap[{i}]").Pi for i in hours}
+        self.results["dual_balance"] = {i: get(f"Balance[{i}]").Pi for i in hours}
+        self.results["dual_soc_dyn"] = {i: get(f"SOC_dyn[{i}]").Pi for i in hours if i > 0}
+        self.results["dual_soc_init"] = get("SOC_init").Pi if get("SOC_init") else None
+        self.results["dual_soc_final"] = get("SOC_final").Pi if get("SOC_final") else None
 
 # ---- SWEEP FUNCTIONS (1c) ----
 # For sensitivity analysis on 1c

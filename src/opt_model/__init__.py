@@ -1,1 +1,1 @@
-from .opt_model import OptimizationModel1a, OptimizationModel1b, OptimizationModel1c
+from .opt_model import OptimizationModel1a, OptimizationModel1b, OptimizationModel1c, OptimizationModel2b

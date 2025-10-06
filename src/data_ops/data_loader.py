@@ -49,3 +49,7 @@ class DataLoader1b(BaseDataLoader):
 class DataLoader1c(BaseDataLoader):
     def __init__(self):
         super().__init__("question_1c")
+
+class DataLoader2b(BaseDataLoader):
+    def __init__(self):
+        super().__init__("question_2b")

@@ -327,6 +327,7 @@ class OptimizationModel1c:
         self.results["dual_soc_init"] = get("SOC_init").Pi if get("SOC_init") else None
         self.results["dual_soc_final"] = get("SOC_final").Pi if get("SOC_final") else None
 
+
 class OptimizationModel2b:
     """Flexible load + option of battery (2b): maximize profit - λ*deviation with storage dynamics."""
 
@@ -364,6 +365,10 @@ class OptimizationModel2b:
         soc_init = prefs["initial_soc_ratio"] * cap
         soc_final = prefs["final_soc_ratio"] * cap
 
+        # Battery parameters
+        T_max = storage["battery_lifetime_yrs"] * 365 * 24  # hours in lifetime (10 years)
+        Bat_cost = storage["battery_cost_per_kWh"]  # DKK per kWh of capacity (value set to 150 in data)
+
         # Decision variables
         self.x = self.model.addVars(hours, name="x", lb=0)                  # PV used
         self.y = self.model.addVars(hours, name="y", lb=0)                  # import
@@ -373,9 +378,12 @@ class OptimizationModel2b:
         self.l = self.model.addVars(hours, name="l", lb=0)                  # explicit flexible (kept for API)
 
         # Battery variables
-        self.charge = self.model.addVars(hours, name="charge", lb=0, ub=p_ch_max)
-        self.discharge = self.model.addVars(hours, name="discharge", lb=0, ub=p_dis_max)
-        self.soc = self.model.addVars(hours, name="soc", lb=0, ub=cap)
+        self.charge = self.model.addVars(hours, name="charge", lb=0)
+        self.discharge = self.model.addVars(hours, name="discharge", lb=0)
+        self.soc = self.model.addVars(hours, name="soc", lb=0)
+
+        # Additional battery investment scaling variable
+        self.Bat_scale = self.model.addVars(name="Bat_scale", lb=0)
 
         # PV cap
         self.model.addConstrs((self.x[i] <= pv[i] for i in hours), name="PVcap")
@@ -403,14 +411,21 @@ class OptimizationModel2b:
             ),
             name="SOC_dyn",
         )
+
+        # Battery characteristics scaling constraints
         self.model.addConstr(self.soc[max(hours)] == soc_final, name="SOC_final")  # final SOC
 
+        # New SOC upper bound scaling with investment
+        self.model.addConstrs((self.soc[i] <= cap * self.Bat_scale for i in hours), name="SOC_cap")
+        self.model.addConstrs((self.charge[i] <= p_ch_max * self.Bat_scale for i in hours), name="Charge_cap")
+        self.model.addConstrs((self.discharge[i] <= p_dis_max * self.Bat_scale for i in hours), name="Discharge_cap")
+
         # Maximize profit minus discomfort
-        self.model.setObjective(
+        self.model.setObjective((
             gp.quicksum(
                 self.z[i] * (s[i] - GE) - self.y[i] * (b[i] + GI) - lam * self.u[i]  # rev - cost - discomfort
                 for i in hours
-            ),
+            ) - Bat_cost * cap * self.Bat_scale), # subtracting battery cost
             GRB.MAXIMIZE,
         )
 
@@ -449,6 +464,7 @@ class OptimizationModel2b:
         self.results["charge"] = {i: self.charge[i].X for i in hours}
         self.results["discharge"] = {i: self.discharge[i].X for i in hours}
         self.results["soc"] = {i: self.soc[i].X for i in hours}
+        self.results["battery_scale"] = self.Bat_scale.X
 
         # Totals
         self.results["total_import"] = sum(self.results["import"].values())

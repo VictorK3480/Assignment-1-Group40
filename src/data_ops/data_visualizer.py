@@ -347,3 +347,169 @@ class DataVisualizer:
         axs[-1].set_xlabel("Hour")
         plt.tight_layout()
         plt.show()
+
+    # ===== 2b =====
+    @staticmethod
+    def plot_hourly_energy_flows_2b(results: Dict[str, Any], start_hour: int = 16, end_hour: int = 21) -> None:
+        # Guard: clamp to provided keys
+        all_hours = list(results["pv"].keys())
+        hours = [h for h in all_hours if start_hour <= h <= end_hour]
+
+        pv_vals = [results["pv"][h] for h in hours]
+        imp_vals = [results["import"][h] for h in hours]
+        exp_vals = [results["export"][h] for h in hours]
+        served_vals = [results["served"][h] for h in hours]
+        ref_vals = [results["reference_load"][h] for h in hours]
+        charge_vals = [results["charge"][h] for h in hours]
+        discharge_vals = [results["discharge"][h] for h in hours]
+
+        plt.figure(figsize=(10, 3))
+        plt.plot(hours, pv_vals, marker="o", label="PV")
+        plt.plot(hours, imp_vals, marker="s", label="Import")
+        plt.plot(hours, exp_vals, marker="^", label="Export")
+        plt.plot(hours, served_vals, marker="d", label="Served")
+        plt.plot(hours, ref_vals, marker="x", linestyle="--", label="Reference")
+        plt.plot(hours, charge_vals, marker="<", label="Charge")
+        plt.plot(hours, discharge_vals, marker=">", label="Discharge")
+        plt.xlabel("Hour")
+        plt.ylabel("Energy [kWh]")
+        plt.title("Hourly Energy Flows – 1c")
+        plt.legend()
+        plt.grid(True, linestyle="--", alpha=0.7)
+        plt.tight_layout()
+        plt.show()
+
+    @staticmethod
+    def plot_battery_soc_2b(results: Dict[str, Any]) -> None:
+        hours = list(results["soc"].keys())
+        soc_vals = list(results["soc"].values())
+
+        plt.figure(figsize=(10, 3))
+        plt.step(hours, soc_vals, where="mid", marker="o", label="SOC")
+        plt.xlabel("Hour")
+        plt.ylabel("SOC [kWh]")
+        plt.title("Battery SOC – 1c")
+        plt.grid(True, linestyle="--", alpha=0.7)
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+    @staticmethod
+    def plot_hourly_energy_flows_subplots_GE_1c(results_all: List[Dict[str, Any]], selected_GEs: List[float]) -> None:
+        fig, axs = plt.subplots(len(selected_GEs), 1, figsize=(12, 2.5 * len(selected_GEs)), sharex=True)
+        if len(selected_GEs) == 1:
+            axs = [axs]
+
+        for idx, ge in enumerate(selected_GEs):
+            res = next(r for r in results_all if abs(r["GE"] - ge) < 1e-6)
+            hours = list(res["pv"].keys())
+            pv = list(res["pv"].values())
+            imports = list(res["import"].values())
+            exports = list(res["export"].values())
+            served = list(res["served"].values())
+            ref_load = list(res["reference_load"].values())
+            charge = list(res["charge"].values())
+            discharge = list(res["discharge"].values())
+
+            axs[idx].plot(hours, pv, label="PV", marker="o")
+            axs[idx].plot(hours, imports, label="Import", marker="s")
+            axs[idx].plot(hours, exports, label="Export", marker="^")
+            axs[idx].plot(hours, served, label="Served", marker="d")
+            axs[idx].plot(hours, ref_load, label="Reference", linestyle="--")
+            axs[idx].plot(hours, charge, label="Charge", marker="<")
+            axs[idx].plot(hours, discharge, label="Discharge", marker=">")
+            axs[idx].set_ylabel("Energy [kWh]")
+            axs[idx].set_title(f"Hourly Flows – GE={ge}")
+            axs[idx].legend()
+            axs[idx].grid(True, linestyle="--", alpha=0.6)
+
+        axs[-1].set_xlabel("Hour")
+        plt.tight_layout()
+        plt.show()
+
+    @staticmethod
+    def plot_hourly_energy_flows_subplots_buying_2b(results_all: List[Dict[str, Any]], factors: List[float]) -> None:
+        fig, axs = plt.subplots(len(factors), 1, figsize=(12, 2.5 * len(factors)), sharex=True)
+        if len(factors) == 1:
+            axs = [axs]
+
+        for idx, f in enumerate(factors):
+            res = next(r for r in results_all if abs(r["factor"] - f) < 1e-6)
+            hours = list(res["pv"].keys())
+            pv = list(res["pv"].values())
+            imports = list(res["import"].values())
+            exports = list(res["export"].values())
+            served = list(res["served"].values())
+            ref_load = list(res["reference_load"].values())
+
+            axs[idx].plot(hours, pv, label="PV", marker="o")
+            axs[idx].plot(hours, imports, label="Import", marker="s")
+            axs[idx].plot(hours, exports, label="Export", marker="^")
+            axs[idx].plot(hours, served, label="Served", marker="d")
+            axs[idx].plot(hours, ref_load, linestyle="--", label="Reference")
+            axs[idx].set_ylabel("Energy [kWh]")
+            axs[idx].set_title(f"Hourly Flows – Buying factor={f}")
+            axs[idx].legend()
+            axs[idx].grid(True, linestyle="--", alpha=0.6)
+
+        axs[-1].set_xlabel("Hour")
+        plt.tight_layout()
+        plt.show()
+
+    @staticmethod
+    def plot_hourly_energy_flows_subplots_omega_2b(results_all: List[Dict[str, Any]], omegas: List[float]) -> None:
+        fig, axs = plt.subplots(len(omegas), 1, figsize=(12, 2.5 * len(omegas)), sharex=True)
+        if len(omegas) == 1:
+            axs = [axs]
+
+        for idx, om in enumerate(omegas):
+            res = next(r for r in results_all if abs(r["omega"] - om) < 1e-6)
+            hours = list(res["pv"].keys())
+            pv = list(res["pv"].values())
+            imports = list(res["import"].values())
+            exports = list(res["export"].values())
+            served = list(res["served"].values())
+            ref_load = list(res["reference_load"].values())
+
+            axs[idx].plot(hours, pv, label="PV", marker="o")
+            axs[idx].plot(hours, imports, label="Import", marker="s")
+            axs[idx].plot(hours, exports, label="Export", marker="^")
+            axs[idx].plot(hours, served, label="Served", marker="d")
+            axs[idx].plot(hours, ref_load, linestyle="--", label="Reference")
+            axs[idx].set_ylabel("Energy [kWh]")
+            axs[idx].set_title(f"Hourly Flows – ω={om}")
+            axs[idx].legend()
+            axs[idx].grid(True, linestyle="--", alpha=0.6)
+
+        axs[-1].set_xlabel("Hour")
+        plt.tight_layout()
+        plt.show()
+
+    @staticmethod
+    def plot_hourly_energy_flows_subplots_tolerance_2b(results_all: List[Dict[str, Any]], tolerances: List[float], omega: float = 1.5) -> None:
+        fig, axs = plt.subplots(len(tolerances), 1, figsize=(12, 2.5 * len(tolerances)), sharex=True)
+        if len(tolerances) == 1:
+            axs = [axs]
+
+        for idx, tau in enumerate(tolerances):
+            res = next(r for r in results_all if abs(r["tolerance_ratio"] - tau) < 1e-6)
+            hours = list(res["pv"].keys())
+            pv = list(res["pv"].values())
+            imports = list(res["import"].values())
+            exports = list(res["export"].values())
+            served = list(res["served"].values())
+            ref_load = list(res["reference_load"].values())
+
+            axs[idx].plot(hours, pv, label="PV", marker="o")
+            axs[idx].plot(hours, imports, label="Import", marker="s")
+            axs[idx].plot(hours, exports, label="Export", marker="^")
+            axs[idx].plot(hours, served, label="Served", marker="d")
+            axs[idx].plot(hours, ref_load, linestyle="--", label="Reference")
+            axs[idx].set_ylabel("Energy [kWh]")
+            axs[idx].set_title(f"Hourly Flows – ω={omega}, τ={tau}")
+            axs[idx].legend()
+            axs[idx].grid(True, linestyle="--", alpha=0.6)
+
+        axs[-1].set_xlabel("Hour")
+        plt.tight_layout()
+        plt.show()

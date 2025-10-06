@@ -1,11 +1,12 @@
 from typing import Dict, Any, List
 import numpy as np
 
-from src.data_ops.data_loader import DataLoader1a, DataLoader1b, DataLoader1c
+from src.data_ops.data_loader import DataLoader1a, DataLoader1b, DataLoader1c, DataLoader2b
 from src.opt_model.opt_model import (
     OptimizationModel1a,
     OptimizationModel1b,
     OptimizationModel1c,
+    OptimizationModel2b,
     sweep_GE_1c,
     sweep_buying_factor_1c,
     sweep_omega_1c,
@@ -272,3 +273,49 @@ def run_tolerance_sweep_1c(tolerances: List[float] | None = None, omega: float =
         res["tolerance_ratio"] = float(tau)
         results_all.append(res)
     return results_all
+
+# ===== Model 2b =====
+def run_optimization_2b(lambda_discomfort: float = 1.5) -> Dict[str, Any]:
+    loader = DataLoader2b()
+    DER_prod = loader.load_der_production()
+    app_params_raw = loader.load_appliance_params()
+    bus_params = loader.load_bus_params()
+    usage_raw = loader.load_usage_preferences()
+
+    # Normalize list/dict to dicts
+    app_params = app_params_raw[0] if isinstance(app_params_raw, list) else app_params_raw
+    usage = usage_raw[0] if isinstance(usage_raw, list) else usage_raw
+
+    hours = range(len(DER_prod))
+    PV_capacity = app_params["DER"][0]["max_power_kW"]
+    pv = {i: PV_capacity * DER_prod[i] for i in hours}
+
+    b = {i: bus_params["energy_price_DKK_per_kWh"][i] for i in hours}
+    s = b.copy()
+    GI = bus_params["import_tariff_DKK/kWh"]
+    GE = bus_params["export_tariff_DKK/kWh"]
+
+    ratios = usage["load_preferences"][0]["hourly_profile_ratio"]
+    d_hour = app_params["load"][0]["max_load_kWh_per_hour"]
+    ref_load = {i: d_hour * ratios[i] for i in hours}
+
+    storage = app_params["storage"][0]
+    prefs = usage["storage_preferences"][0]
+
+    params = {
+        "hours": hours,
+        "pv": pv,
+        "b": b,
+        "s": s,
+        "GE": GE,
+        "GI": GI,
+        "ref_load": ref_load,
+        "d_hour": d_hour,
+        "lambda_discomfort": lambda_discomfort,
+        "storage": [storage],
+        "storage_preferences": [prefs],
+    }
+
+    opt = OptimizationModel2b(params)
+    opt.run()
+    return opt.results

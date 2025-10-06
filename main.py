@@ -9,6 +9,7 @@ from src.runner.runner import (
     run_export_tariff_sweep,
     run_optimization_1b,
     run_optimization_1c,
+    run_optimization_2b,
     sweep_1b,
     run_GE_sweep_1c,
     run_buying_factor_sweep_1c,

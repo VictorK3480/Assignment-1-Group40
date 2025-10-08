@@ -39,46 +39,46 @@ if __name__ == "__main__":
     # results_sweep_1b = sweep_1b()
     # DataVisualizer.plot_sweep_1b(results_sweep_1b)
 
-    # Model 1c – Flexible Load + Battery
+    # # Model 1c – Flexible Load + Battery
 
-    # Base case 
-    results_1c = run_optimization_1c(lambda_discomfort=1.5)
-    print_results(results_1c, model="1c")
-    DataVisualizer.plot_hourly_energy_flows_1c(results_1c)
-    DataVisualizer.plot_battery_soc_1c(results_1c)
+    # # Base case 
+    # results_1c = run_optimization_1c(lambda_discomfort=1.5)
+    # print_results(results_1c, model="1c")
+    # DataVisualizer.plot_hourly_energy_flows_1c(results_1c)
+    # DataVisualizer.plot_battery_soc_1c(results_1c)
 
 
-    # GE Sweep 
-    ge_results = run_GE_sweep_1c()
-    selected_GEs = [0.85, 1.3, 2.5]  # chosen export tariffs
-    selected_ge_results = [
-        r for r in ge_results if round(r["GE"], 2) in selected_GEs and "pv" in r
-    ]
+    # # GE Sweep 
+    # ge_results = run_GE_sweep_1c()
+    # selected_GEs = [0.85, 1.3, 2.5]  # chosen export tariffs
+    # selected_ge_results = [
+    #     r for r in ge_results if round(r["GE"], 2) in selected_GEs and "pv" in r
+    # ]
 
-    for res in selected_ge_results:
-        print_results(res, model=f"1c (GE={res['GE']})")
+    # for res in selected_ge_results:
+    #     print_results(res, model=f"1c (GE={res['GE']})")
 
-    DataVisualizer.plot_hourly_energy_flows_subplots_GE_1c(
-        selected_ge_results, selected_GEs=selected_GEs
-    )
+    # DataVisualizer.plot_hourly_energy_flows_subplots_GE_1c(
+    #     selected_ge_results, selected_GEs=selected_GEs
+    # )
 
-    # Omega Sweep 
-    omega_results = run_omega_sweep_1c()
-    for res in omega_results:
-        print_results(res, model=f"1c (ω={res['omega']})")
+    # # Omega Sweep 
+    # omega_results = run_omega_sweep_1c()
+    # for res in omega_results:
+    #     print_results(res, model=f"1c (ω={res['omega']})")
 
-    DataVisualizer.plot_hourly_energy_flows_subplots_omega_1c(
-        omega_results, omegas=[1, 2, 3]
-    )
+    # DataVisualizer.plot_hourly_energy_flows_subplots_omega_1c(
+    #     omega_results, omegas=[1, 2, 3]
+    # )
 
-    # Tolerance Sweep
-    tol_results = run_tolerance_sweep_1c()
-    for res in tol_results:
-        print_results(res, model=f"1c (τ={res['tolerance_ratio']})")
+    # # Tolerance Sweep
+    # tol_results = run_tolerance_sweep_1c()
+    # for res in tol_results:
+    #     print_results(res, model=f"1c (τ={res['tolerance_ratio']})")
 
-    DataVisualizer.plot_hourly_energy_flows_subplots_tolerance_1c(
-        tol_results, tolerances=[0.2, 0.4, 0.6, 0.8], omega=1.5
-    )
+    # DataVisualizer.plot_hourly_energy_flows_subplots_tolerance_1c(
+    #     tol_results, tolerances=[0.2, 0.4, 0.6, 0.8], omega=1.5
+    # )
 
 
 

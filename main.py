@@ -81,4 +81,20 @@ if __name__ == "__main__":
     # )
 
 
+    # 2b
+
+    results_2b = run_optimization_2b(lambda_discomfort=1.5)
+    print_results(results_2b, model="2b")
+    DataVisualizer.plot_hourly_energy_flows_2b(results_2b)
+    DataVisualizer.plot_battery_soc_2b(results_2b)
+
+    # # Omega Sweep 
+    # omega_results = run_omega_sweep_2b()
+    # for res in omega_results:
+    #     print_results(res, model=f"2b (ω={res['omega']})")
+
+    # DataVisualizer.plot_hourly_energy_flows_subplots_omega_1c(
+    #     omega_results, omegas=[1, 2, 3]
+    # )
+
 

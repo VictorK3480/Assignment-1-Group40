@@ -30,7 +30,7 @@
       "charging_efficiency": 0.9,
       "discharging_efficiency": 0.9,
       "battery_lifetime_yrs": 10,
-      "battery_cost_per_kWh": 150.0
+      "battery_cost_per_kWh": 2.0
     }
   ]
 }

@@ -373,7 +373,7 @@ class DataVisualizer:
         plt.plot(hours, discharge_vals, marker=">", label="Discharge")
         plt.xlabel("Hour")
         plt.ylabel("Energy [kWh]")
-        plt.title("Hourly Energy Flows – 1c")
+        plt.title("Hourly Energy Flows – 2b")
         plt.legend()
         plt.grid(True, linestyle="--", alpha=0.7)
         plt.tight_layout()
@@ -388,38 +388,71 @@ class DataVisualizer:
         plt.step(hours, soc_vals, where="mid", marker="o", label="SOC")
         plt.xlabel("Hour")
         plt.ylabel("SOC [kWh]")
-        plt.title("Battery SOC – 1c")
+        plt.title("Battery SOC – 2b")
         plt.grid(True, linestyle="--", alpha=0.7)
         plt.legend()
         plt.tight_layout()
         plt.show()
 
     @staticmethod
-    def plot_hourly_energy_flows_subplots_omega_2b(results_all: List[Dict[str, Any]], omegas: List[float]) -> None:
-        fig, axs = plt.subplots(len(omegas), 1, figsize=(12, 2.5 * len(omegas)), sharex=True)
-        if len(omegas) == 1:
-            axs = [axs]
+    def plot_omega_sweep(results):
+        # filter valid runs
+        valid_results = [r for r in results if "battery_scale" in r and "objective" in r]
+        if not valid_results:
+            print("No valid results to plot (all runs failed).")
+            return
 
-        for idx, om in enumerate(omegas):
-            res = next(r for r in results_all if abs(r["omega"] - om) < 1e-6)
-            hours = list(res["pv"].keys())
-            pv = list(res["pv"].values())
-            imports = list(res["import"].values())
-            exports = list(res["export"].values())
-            served = list(res["served"].values())
-            ref_load = list(res["reference_load"].values())
+        omegas = [r["omega"] for r in valid_results]
+        scales = [r["battery_scale"] for r in valid_results]
+        objectives = [r["objective"] for r in valid_results]
 
-            axs[idx].plot(hours, pv, label="PV", marker="o")
-            axs[idx].plot(hours, imports, label="Import", marker="s")
-            axs[idx].plot(hours, exports, label="Export", marker="^")
-            axs[idx].plot(hours, served, label="Served", marker="d")
-            axs[idx].plot(hours, ref_load, linestyle="--", label="Reference")
-            axs[idx].set_ylabel("Energy [kWh]")
-            axs[idx].set_title(f"Hourly Flows – ω={om}")
-            axs[idx].legend()
-            axs[idx].grid(True, linestyle="--", alpha=0.6)
+        fig, ax1 = plt.subplots()
 
-        axs[-1].set_xlabel("Hour")
-        plt.tight_layout()
+        color = "tab:blue"
+        ax1.set_xlabel("Omega (λ_discomfort)")
+        ax1.set_ylabel("Battery scaling factor", color=color)
+        ax1.plot(omegas, scales, marker="o", color=color)
+        ax1.tick_params(axis="y", labelcolor=color)
+
+        ax2 = ax1.twinx()
+        color = "tab:red"
+        ax2.set_ylabel("Objective value (DKK)", color=color)
+        ax2.plot(omegas, objectives, marker="s", color=color)
+        ax2.tick_params(axis="y", labelcolor=color)
+
+        fig.tight_layout()
+        plt.title("Sensitivity of battery scale & objective to omega")
         plt.show()
+
+    @staticmethod
+    def plot_battery_cost_sweep(results):
+        # filter out runs without battery_scale
+        valid_results = [r for r in results if "battery_scale" in r and "objective" in r]
+
+        if not valid_results:
+            print("No valid results to plot.")
+            return
+        
+        costs = [r["battery_cost_per_kWh"] for r in results]
+        scales = [r["battery_scale"] for r in results]
+        objectives = [r["objective"] for r in results]
+
+        fig, ax1 = plt.subplots()
+
+        color = "tab:blue"
+        ax1.set_xlabel("Battery cost per kWh (DKK)")
+        ax1.set_ylabel("Battery scaling factor", color=color)
+        ax1.plot(costs, scales, marker="o", color=color, label="Battery scale")
+        ax1.tick_params(axis="y", labelcolor=color)
+
+        ax2 = ax1.twinx()
+        color = "tab:red"
+        ax2.set_ylabel("Objective value (DKK)", color=color)
+        ax2.plot(costs, objectives, marker="s", color=color, label="Objective")
+        ax2.tick_params(axis="y", labelcolor=color)
+
+        fig.tight_layout()
+        plt.title("Sensitivity of battery scale & objective to battery cost")
+        plt.show()
+
 

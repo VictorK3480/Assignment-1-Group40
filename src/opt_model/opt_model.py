@@ -1,7 +1,7 @@
 import gurobipy as gp
 from gurobipy import GRB
 from typing import Dict, Any, Iterable
-from src.data_ops.data_loader import DataLoader1a, DataLoader1b, DataLoader1c
+from src.data_ops.data_loader import DataLoader1a, DataLoader1b, DataLoader1c, DataLoader2b
 
 # Quiet Gurobi globally; allow per-model override if needed
 gp.setParam("LogToConsole", 0)
@@ -365,8 +365,8 @@ class OptimizationModel2b:
         eta_d = storage["discharging_efficiency"]
         p_ch_max = storage["max_charging_power_ratio"] * cap
         p_dis_max = storage["max_discharging_power_ratio"] * cap
-        soc_init = prefs["initial_soc_ratio"] * cap
-        soc_final = prefs["final_soc_ratio"] * cap
+        soc_init = prefs["initial_soc_ratio"] 
+        soc_final = prefs["final_soc_ratio"]
 
         # Battery parameters
         T_max = storage["battery_lifetime_yrs"] * 365 * 24  # hours in lifetime (10 years)
@@ -387,7 +387,7 @@ class OptimizationModel2b:
 
         # Additional battery investment scaling variable
         self.Bat_scale = self.model.addVar(name="Bat_scale", lb=0)
-        self.Bat_cutoff = self.model.addVars(hours, name="Bat_cutoff", vtype=GRB.BINARY)
+        self.Bat_cutoff = self.model.addVars(hours, lb=0, ub=1, name="Bat_cutoff")
 
         # PV cap
         self.model.addConstrs((self.x[i] <= pv[i] for i in hours), name="PVcap")
@@ -404,7 +404,7 @@ class OptimizationModel2b:
 
         # SOC dynamics
         self.model.addConstr(
-            self.soc[0] == soc_init + eta_c * self.charge[0] - (1 / eta_d) * self.discharge[0],
+            self.soc[0] == (soc_init * cap * self.Bat_scale) + eta_c * self.charge[0] - (1 / eta_d) * self.discharge[0],
             name="SOC_init",
         )
         self.model.addConstrs(
@@ -417,12 +417,12 @@ class OptimizationModel2b:
         )
 
         # Battery characteristics scaling constraints
-        # self.model.addConstr(self.soc[max(hours)] == soc_final, name="SOC_final")  # final SOC
+        self.model.addConstr(self.soc[max(hours)] == soc_final *cap * self.Bat_scale, name="SOC_final")  # final SOC
 
         # New SOC upper bound scaling with investment
         self.model.addConstrs((self.soc[i] <= cap * self.Bat_scale for i in hours), name="SOC_cap")
-        self.model.addConstrs((self.charge[i] <= p_ch_max * self.Bat_scale * self.Bat_cutoff[i] for i in hours), name="Charge_cap")
-        self.model.addConstrs((self.discharge[i] <= p_dis_max * self.Bat_scale * self.Bat_cutoff[i] for i in hours), name="Discharge_cap")
+        self.model.addConstrs((self.charge[i] <= p_ch_max * self.Bat_scale for i in hours), name="Charge_cap")
+        self.model.addConstrs((self.discharge[i] <= p_dis_max * self.Bat_scale for i in hours), name="Discharge_cap")
 
         # Battery turnoff constraint after T_max is hit
         self.model.addConstrs((self.Bat_cutoff[i]*i <= T_max for i in hours), name="Battery_turnoff")
@@ -453,31 +453,14 @@ class OptimizationModel2b:
         export_rev = sum(self.z[i].X * (self.params["s"][i] - self.params["GE"]) for i in hours)
         discomfort = sum(self.params["lambda_discomfort"] * self.u[i].X for i in hours)
         battery_cost = self.params["storage"][0]["battery_cost_per_kWh"] * self.params["storage"][0]["storage_capacity_kWh"] * self.Bat_scale.X
+        battery_scale = self.Bat_scale.X
 
         self.results["objective"] = float(self.model.ObjVal)
         self.results["import_cost"] = import_cost
         self.results["export_revenue"] = export_rev
         self.results["discomfort_penalty"] = discomfort
+        self.results["battery_cost"] = battery_cost
         self.results["net_profit"] = export_rev - import_cost - discomfort - battery_cost
-
-        # Economics
-        # self.results["battery_cost_total"] = self.params["storage"][0]["battery_cost_per_kWh"] * cap * self.Bat_scale.X
-        # self.results["gross_profit_no_batt"] = self.results["net_profit"] + self.results["battery_cost_total"]
-        
-        # # Ratios
-        # total_ref = sum(self.results["reference_load"].values())
-        # self.results["self_sufficiency"] = self.results["total_served"] / total_ref if total_ref > 0 else None
-        # total_pv = sum(self.results["pv"].values())
-        # self.results["self_consumption_ratio"] = self.results["self_consumption"] / total_pv if total_pv > 0 else None
-        
-        # # Battery stats
-        # self.results["soc_max"] = max(self.results["soc"].values())
-        # self.results["soc_min"] = min(self.results["soc"].values())
-        # self.results["soc_avg"] = sum(self.results["soc"].values()) / len(hours)
-        # self.results["max_charge_used"] = max(self.results["charge"].values())
-        # self.results["max_discharge_used"] = max(self.results["discharge"].values())
-        # self.results["approx_cycles"] = 0.5 * sum(self.results["charge"].values()) / cap
-
 
         # Hourly primals
         self.results["import"] = {i: self.y[i].X for i in hours}
@@ -492,6 +475,9 @@ class OptimizationModel2b:
         self.results["discharge"] = {i: self.discharge[i].X for i in hours}
         self.results["soc"] = {i: self.soc[i].X for i in hours}
         self.results["battery_scale"] = self.Bat_scale.X
+        
+        # Battery scaling factor
+        self.results["battery_scale"] = battery_scale
 
         # Totals
         self.results["total_import"] = sum(self.results["import"].values())
@@ -504,18 +490,19 @@ class OptimizationModel2b:
         # Self-consumption: PV used to serve load (bounded by each)
         self.results["self_consumption"] = sum(min(self.results["pv"][i], self.results["served"][i]) for i in hours)
 
-        # # Duals
-        # get = self.model.getConstrByName
-        # self.results["dual_pv_cap"] = {i: get(f"PVcap[{i}]").Pi for i in hours}
-        # self.results["dual_balance"] = {i: get(f"Balance[{i}]").Pi for i in hours}
-        # self.results["dual_soc_dyn"] = {i: get(f"SOC_dyn[{i}]").Pi for i in hours if i > 0}
-        # self.results["dual_soc_init"] = get("SOC_init").Pi if get("SOC_init") else None
-        # self.results["dual_soc_final"] = get("SOC_final").Pi if get("SOC_final") else None
-        # self.results["dual_dev_pos"] = {i: get(f"Dev_pos[{i}]").Pi for i in hours}
-        # self.results["dual_dev_neg"] = {i: get(f"Dev_neg[{i}]").Pi for i in hours}
-        # self.results["dual_soc_cap"] = {i: get(f"SOC_cap[{i}]").Pi for i in hours}
-        # self.results["dual_charge_cap"] = {i: get(f"Charge_cap[{i}]").Pi for i in hours}
-        # self.results["dual_discharge_cap"] = {i: get(f"Discharge_cap[{i}]").Pi for i in hours}
+        # Duals
+        get = self.model.getConstrByName
+        self.results["dual_pv_cap"] = {i: get(f"PVcap[{i}]").Pi for i in hours}
+        self.results["dual_balance"] = {i: get(f"Balance[{i}]").Pi for i in hours}
+        self.results["dual_soc_dyn"] = {i: get(f"SOC_dyn[{i}]").Pi for i in hours if i > 0}
+        self.results["dual_soc_init"] = get("SOC_init").Pi if get("SOC_init") else None
+        self.results["dual_soc_final"] = get("SOC_final").Pi if get("SOC_final") else None
+        self.results["dual_dev_pos"] = {i: get(f"Dev_pos[{i}]").Pi for i in hours}
+        self.results["dual_dev_neg"] = {i: get(f"Dev_neg[{i}]").Pi for i in hours}
+        self.results["dual_soc_cap"] = {i: get(f"SOC_cap[{i}]").Pi for i in hours}
+        self.results["dual_charge_cap"] = {i: get(f"Charge_cap[{i}]").Pi for i in hours}
+        self.results["dual_discharge_cap"] = {i: get(f"Discharge_cap[{i}]").Pi for i in hours}
+
 
 # ---- SWEEP FUNCTIONS (1c) ----
 # For sensitivity analysis on 1c
@@ -693,3 +680,50 @@ def sweep_tolerance_1c(tolerance_ratio: float, lambda_discomfort: float = 1.5, G
     res = model.results.copy()
     res["tolerance_ratio"] = tolerance_ratio
     return res
+
+
+# ------- 2b SWEEP FUNCTIONS -------
+# For sensitivity analysis on 2b
+
+def sweep_omega_2b(lambda_discomfort: float, GE: float = 0.4) -> Dict[str, Any]:
+    loader = DataLoader2b()
+    DER_prod = loader.load_der_production()
+    app_params = loader.load_appliance_params()
+    bus_params = loader.load_bus_params()
+    usage = loader.load_usage_preferences()
+
+    hours = range(len(DER_prod))
+    PV_capacity = app_params["DER"][0]["max_power_kW"]
+    pv = {i: PV_capacity * DER_prod[i] for i in hours}
+
+    b = {i: bus_params["energy_price_DKK_per_kWh"][i] for i in hours}
+    s = b.copy()
+    GI = bus_params["import_tariff_DKK/kWh"]
+
+    ratios = usage["load_preferences"][0]["hourly_profile_ratio"]
+    d_hour = app_params["load"][0]["max_load_kWh_per_hour"]
+    ref_load = {i: d_hour * ratios[i] for i in hours}
+
+    storage = app_params["storage"]
+    prefs = usage["storage_preferences"]
+
+    params = {
+        "hours": hours,
+        "pv": pv,
+        "b": b,
+        "s": s,
+        "GE": GE,
+        "GI": GI,
+        "ref_load": ref_load,
+        "d_hour": d_hour,
+        "lambda_discomfort": lambda_discomfort,
+        "storage": storage,
+        "storage_preferences": prefs,
+    }
+
+    model = OptimizationModel2b(params)
+    model.run()
+    res = model.results.copy()
+    res["omega"] = lambda_discomfort
+    return res
+

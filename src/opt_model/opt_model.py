@@ -386,7 +386,7 @@ class OptimizationModel2b:
         self.soc = self.model.addVars(hours, name="soc", lb=0)
 
         # Additional battery investment scaling variable
-        self.Bat_scale = self.model.addVars(name="Bat_scale", lb=0)
+        self.Bat_scale = self.model.addVar(name="Bat_scale", lb=0)
         self.Bat_cutoff = self.model.addVars(hours, name="Bat_cutoff", vtype=GRB.BINARY)
 
         # PV cap
@@ -417,7 +417,7 @@ class OptimizationModel2b:
         )
 
         # Battery characteristics scaling constraints
-        self.model.addConstr(self.soc[max(hours)] == soc_final, name="SOC_final")  # final SOC
+        # self.model.addConstr(self.soc[max(hours)] == soc_final, name="SOC_final")  # final SOC
 
         # New SOC upper bound scaling with investment
         self.model.addConstrs((self.soc[i] <= cap * self.Bat_scale for i in hours), name="SOC_cap")
@@ -425,7 +425,7 @@ class OptimizationModel2b:
         self.model.addConstrs((self.discharge[i] <= p_dis_max * self.Bat_scale * self.Bat_cutoff[i] for i in hours), name="Discharge_cap")
 
         # Battery turnoff constraint after T_max is hit
-        self.mode.addConstrs((self.Bat_cutoff[i]*i <= T_max for i in hours), name="Battery_turnoff")
+        self.model.addConstrs((self.Bat_cutoff[i]*i <= T_max for i in hours), name="Battery_turnoff")
 
         # Maximize profit minus discomfort
         self.model.setObjective((
@@ -452,30 +452,31 @@ class OptimizationModel2b:
         import_cost = sum(self.y[i].X * (self.params["b"][i] + self.params["GI"]) for i in hours)
         export_rev = sum(self.z[i].X * (self.params["s"][i] - self.params["GE"]) for i in hours)
         discomfort = sum(self.params["lambda_discomfort"] * self.u[i].X for i in hours)
+        battery_cost = self.params["storage"][0]["battery_cost_per_kWh"] * self.params["storage"][0]["storage_capacity_kWh"] * self.Bat_scale.X
 
         self.results["objective"] = float(self.model.ObjVal)
         self.results["import_cost"] = import_cost
         self.results["export_revenue"] = export_rev
         self.results["discomfort_penalty"] = discomfort
-        self.results["net_profit"] = export_rev - import_cost - discomfort
+        self.results["net_profit"] = export_rev - import_cost - discomfort - battery_cost
 
         # Economics
-        self.results["battery_cost_total"] = self.params["storage"][0]["battery_cost_per_kWh"] * cap * self.Bat_scale.X
-        self.results["gross_profit_no_batt"] = self.results["net_profit"] + self.results["battery_cost_total"]
+        # self.results["battery_cost_total"] = self.params["storage"][0]["battery_cost_per_kWh"] * cap * self.Bat_scale.X
+        # self.results["gross_profit_no_batt"] = self.results["net_profit"] + self.results["battery_cost_total"]
         
-        # Ratios
-        total_ref = sum(self.results["reference_load"].values())
-        self.results["self_sufficiency"] = self.results["total_served"] / total_ref if total_ref > 0 else None
-        total_pv = sum(self.results["pv"].values())
-        self.results["self_consumption_ratio"] = self.results["self_consumption"] / total_pv if total_pv > 0 else None
+        # # Ratios
+        # total_ref = sum(self.results["reference_load"].values())
+        # self.results["self_sufficiency"] = self.results["total_served"] / total_ref if total_ref > 0 else None
+        # total_pv = sum(self.results["pv"].values())
+        # self.results["self_consumption_ratio"] = self.results["self_consumption"] / total_pv if total_pv > 0 else None
         
-        # Battery stats
-        self.results["soc_max"] = max(self.results["soc"].values())
-        self.results["soc_min"] = min(self.results["soc"].values())
-        self.results["soc_avg"] = sum(self.results["soc"].values()) / len(hours)
-        self.results["max_charge_used"] = max(self.results["charge"].values())
-        self.results["max_discharge_used"] = max(self.results["discharge"].values())
-        self.results["approx_cycles"] = 0.5 * sum(self.results["charge"].values()) / cap
+        # # Battery stats
+        # self.results["soc_max"] = max(self.results["soc"].values())
+        # self.results["soc_min"] = min(self.results["soc"].values())
+        # self.results["soc_avg"] = sum(self.results["soc"].values()) / len(hours)
+        # self.results["max_charge_used"] = max(self.results["charge"].values())
+        # self.results["max_discharge_used"] = max(self.results["discharge"].values())
+        # self.results["approx_cycles"] = 0.5 * sum(self.results["charge"].values()) / cap
 
 
         # Hourly primals
@@ -503,18 +504,18 @@ class OptimizationModel2b:
         # Self-consumption: PV used to serve load (bounded by each)
         self.results["self_consumption"] = sum(min(self.results["pv"][i], self.results["served"][i]) for i in hours)
 
-        # Duals
-        get = self.model.getConstrByName
-        self.results["dual_pv_cap"] = {i: get(f"PVcap[{i}]").Pi for i in hours}
-        self.results["dual_balance"] = {i: get(f"Balance[{i}]").Pi for i in hours}
-        self.results["dual_soc_dyn"] = {i: get(f"SOC_dyn[{i}]").Pi for i in hours if i > 0}
-        self.results["dual_soc_init"] = get("SOC_init").Pi if get("SOC_init") else None
-        self.results["dual_soc_final"] = get("SOC_final").Pi if get("SOC_final") else None
-        self.results["dual_dev_pos"] = {i: get(f"Dev_pos[{i}]").Pi for i in hours}
-        self.results["dual_dev_neg"] = {i: get(f"Dev_neg[{i}]").Pi for i in hours}
-        self.results["dual_soc_cap"] = {i: get(f"SOC_cap[{i}]").Pi for i in hours}
-        self.results["dual_charge_cap"] = {i: get(f"Charge_cap[{i}]").Pi for i in hours}
-        self.results["dual_discharge_cap"] = {i: get(f"Discharge_cap[{i}]").Pi for i in hours}
+        # # Duals
+        # get = self.model.getConstrByName
+        # self.results["dual_pv_cap"] = {i: get(f"PVcap[{i}]").Pi for i in hours}
+        # self.results["dual_balance"] = {i: get(f"Balance[{i}]").Pi for i in hours}
+        # self.results["dual_soc_dyn"] = {i: get(f"SOC_dyn[{i}]").Pi for i in hours if i > 0}
+        # self.results["dual_soc_init"] = get("SOC_init").Pi if get("SOC_init") else None
+        # self.results["dual_soc_final"] = get("SOC_final").Pi if get("SOC_final") else None
+        # self.results["dual_dev_pos"] = {i: get(f"Dev_pos[{i}]").Pi for i in hours}
+        # self.results["dual_dev_neg"] = {i: get(f"Dev_neg[{i}]").Pi for i in hours}
+        # self.results["dual_soc_cap"] = {i: get(f"SOC_cap[{i}]").Pi for i in hours}
+        # self.results["dual_charge_cap"] = {i: get(f"Charge_cap[{i}]").Pi for i in hours}
+        # self.results["dual_discharge_cap"] = {i: get(f"Discharge_cap[{i}]").Pi for i in hours}
 
 # ---- SWEEP FUNCTIONS (1c) ----
 # For sensitivity analysis on 1c

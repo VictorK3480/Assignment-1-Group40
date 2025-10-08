@@ -350,7 +350,7 @@ class DataVisualizer:
 
     # ===== 2b =====
     @staticmethod
-    def plot_hourly_energy_flows_2b(results: Dict[str, Any], start_hour: int = 16, end_hour: int = 21) -> None:
+    def plot_hourly_energy_flows_2b(results: Dict[str, Any], start_hour: int = 0, end_hour: int = 87600) -> None:
         # Guard: clamp to provided keys
         all_hours = list(results["pv"].keys())
         hours = [h for h in all_hours if start_hour <= h <= end_hour]

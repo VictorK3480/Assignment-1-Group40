@@ -4,6 +4,8 @@
 # Core optimizer
 gurobipy>=11.0.0
 
+test
+
 # Numerics & data handling
 numpy>=1.26
 pandas>=2.1

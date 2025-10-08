@@ -15,6 +15,8 @@ from src.runner.runner import (
     run_buying_factor_sweep_1c,
     run_omega_sweep_1c,
     run_tolerance_sweep_1c,
+    run_omega_sweep_2b,
+    sweep_battery_cost
 )
 from src.data_ops.data_visualizer import DataVisualizer
 from src.utils import print_results  
@@ -88,13 +90,13 @@ if __name__ == "__main__":
     DataVisualizer.plot_hourly_energy_flows_2b(results_2b)
     DataVisualizer.plot_battery_soc_2b(results_2b)
 
-    # # Omega Sweep 
-    # omega_results = run_omega_sweep_2b()
-    # for res in omega_results:
-    #     print_results(res, model=f"2b (ω={res['omega']})")
 
-    # DataVisualizer.plot_hourly_energy_flows_subplots_omega_1c(
-    #     omega_results, omegas=[1, 2, 3]
-    # )
+   #  Omega Sweep 
+    results_omega = run_omega_sweep_2b(GE=0.4, steps=20)
+    DataVisualizer.plot_omega_sweep(results_omega)
+
+
+    results_cost = sweep_battery_cost(lambda_discomfort=1.5, min_cost=0.12, max_cost=1, steps=20)
+    DataVisualizer.plot_battery_cost_sweep(results_cost)
 
 

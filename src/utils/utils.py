@@ -13,6 +13,8 @@ def print_results(res, model="1a") -> None:
         print(f"  Export revenue      : {res['export_revenue']:.3f} DKK")
     if "discomfort_penalty" in res:
         print(f"  Discomfort penalty  : {res['discomfort_penalty']:.3f} DKK")
+    if "battery_cost" in res:
+        print(f"  Battery cost        : {res['battery_cost']:.3f} DKK")
     if "net_profit" in res:
         print(f"  Net profit          : {res['net_profit']:.3f} DKK")
 

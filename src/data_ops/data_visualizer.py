@@ -409,6 +409,7 @@ class DataVisualizer:
         fig, ax1 = plt.subplots()
 
         color = "tab:blue"
+        fig, ax1 = plt.subplots(figsize=(10, 3))
         ax1.set_xlabel("Omega (λ_discomfort)")
         ax1.set_ylabel("Battery scaling factor", color=color)
         ax1.plot(omegas, scales, marker="o", color=color)
@@ -440,6 +441,7 @@ class DataVisualizer:
         fig, ax1 = plt.subplots()
 
         color = "tab:blue"
+        fig, ax1 = plt.subplots(figsize=(10, 3))
         ax1.set_xlabel("Battery cost per kWh (DKK)")
         ax1.set_ylabel("Battery scaling factor", color=color)
         ax1.plot(costs, scales, marker="o", color=color, label="Battery scale")

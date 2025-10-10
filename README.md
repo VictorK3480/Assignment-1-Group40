@@ -10,7 +10,7 @@ This is the repository for Group 40 for the first Assignment for Optimisation in
 2. Run from the project root:
    ```bash
    python main.py
-3. Please note: 
+3. Please note: comment out the questions you do not want to run (i.e. if you only want to run the results for question 2b, comment out the sections for 1a, 1b and 1c)
 
 ### Code Structure
 

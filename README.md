@@ -1,82 +1,46 @@
 # Assignment 1
 
-## Overview
-
-This repository serves as a template for **Group Assignment 1** in the course **46750 - Optimization in Modern Power Systems**. It provides a structured starting point for your project, including:
-
-- Example datasets for all assignment questions
-- Starter Python code to help you begin your analysis
-- Licensing information
-- Dependency files (`requirements.txt` and `environment.yaml`)
-- A `.gitignore` file
-- This `README.md` with setup and usage instructions
-
-**Note:** This structure is not definitive, and can be adapted to meet each groups' needs as the project advances.
-
-## Installation
-
-Follow the installation instructions below to start working on your group assignment.
-
-### 1. **Clone the repository**
-
-To begin, create a copy of this repository for your group. 
-
-### 2. **Create a virtual environment**
-
-Follow these steps to set up a clean Python environment and install the required packages, so that all required packages are installed when running your code, and your project packages won’t affect the system or other projects.
-
-#### **Option A: Using pip**
-
-To create an isolated Python environment in a folder called venv (its own Python interpreter + its own site-packages and pip):
-```bash
-python -m venv venv 
-```
-Then activate that environment (on macOS/Linux):
-```bash
-source venv/bin/activate 
-```
-Or, using Windows cmd: `\venv\Scripts\Activate.ps1` or Windows PowerShell: `venv\Scripts\Activate.ps1`. Your shell’s PATH is changed so python/pip now point to the ones inside venv.
-
-Install all packages listed in requirements.txt into the active virtual environment (modify the requirements file as needed).
-```bash
-pip install -r requirements.txt
-```
-
-#### **Option B: Using conda**
-
-Create and activate a virtual environment, using the file environment.yaml (modify the environment file as needed):
-```bash
-conda env create -f environment.yaml
-conda activate gurobi-opt
-``` 
+This is the repository for Group 40 for the first Assignment for Optimisation in Modern Power Systems
 
 ### Getting Started
 
-1. **Install dependencies** as described above.
-2. **Explore the starter code** in `main.py` and the `src/` folder to understand the workflow.
-3. **Add your code**:
-    - Implement new functions or classes in the appropriate `src/` subfolder.
-    - Update `main.py` to call your new code for data processing, model setup, or result analysis.
-4. **Run simulations** by executing:
-    ```bash
-    python main.py
-    ```
-    or, if using a Jupyter notebook, run the provided cells.
+1. Install dependencies:
+   ```bash
+   pip install gurobipy matplotlib pandas numpy
+2. Run from the project root:
+   ```bash
+   python main.py
+3. 
 
-5. **Visualize results**: Output files, plots, or logs will be generated as specified in your code. Adjust the code to save results in your preferred format.
+### Code Structure
 
-**Note:** As you extend the codebase, document any new scripts or modules, and changes in structure, in this README for clarity and reproducibility.
-
-### Starter Code Structure
-
- The starter code is organized as follows:
-
-- `main.py`: Entry point for running simulations and analyses. This script parses arguments, loads data, initializes models, and coordinates the workflow.
-- `src/`: Contains all source code modules.
-    - `src/data_ops/`: Classes and functions for loading, validating, and preprocessing input datasets (e.g., reading JSON files, checking data integrity, and preparing data structures for modeling).
-    - `src/opt_model/`: Modular optimization models and algorithms for each assignment question. Each submodule can represent a different modeling approach or scenario, making it easy to extend or modify optimization logic.
-    - `src/runner/`: Scripts or classes that orchestrate the end-to-end execution of simulations, including setting up experiments, running optimization routines, and collecting results.
-    - `src/utils/`: Utility functions and helpers, such as plotting routines, configuration file parsers, logging setup, and other reusable code snippets.
+project_root/
+│
+├── main.py                       # Entry point for running experiments
+│
+├── data/
+│   ├── question_1a/              # Inputs for Model 1a
+│   ├── question_1b/              # Inputs for Model 1b
+│   ├── question_1c/              # Inputs for Model 1c
+│   └── question_2b/              # Inputs for Model 2b
+│
+├── src/
+│   ├── data_ops/                 
+│   │   ├── data_loader.py        # Data loading functions
+│   │   ├── data_processor.py     
+│   │   └── data_visualizer.py    # Plotting functions
+│   │
+│   ├── opt_model/                # Optimization model definitions (for problems 1a, 1b, 1c, and 2b)
+│   │   └── opt_model.py
+│   │
+│   ├── runner/                   # Runs optimisation models and senstivity analyses
+│   │   └── runner.py
+│   │
+│   └── utils/                    # Result printing and summaries
+│       └── utils.py
+│
+├── LICENSE
+└── README.md
 
 ## Input Data Structure
 
@@ -151,8 +115,5 @@ The repositories include base datasets under the `data/question_name` directorie
     - `max_export_kw`: Maximum allowed export power (kW)
     - `price_DKK_per_kWh`: Additional price information if applicable
 
-**Note:**  
-These files allow customization of user behavior, DER production, and network constraints for simulation and optimization. Students can extend or replace these datasets as needed to conduct adequate simulations and sensitivity analysis. We recommend that any new or modified files follow the same structure for compatibility with the starter code, and easy grading. Please document all new datasets in this README.md file.
 
-## Starter Code Structure
 

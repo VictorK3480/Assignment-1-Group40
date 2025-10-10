@@ -44,6 +44,19 @@ class DataVisualizer:
         plt.show()
 
     @staticmethod
+    def plot_buying_price_sweep_1a(results: List[Dict[str, Any]]) -> None:
+        df = pd.DataFrame(results)
+
+        plt.figure(figsize=(8, 2.5))
+        plt.plot(df["factor"], df["objective"], marker="o")
+        plt.xlabel("Buying Price Factor")
+        plt.ylabel("Profit [DKK]")
+        plt.title("Profit vs Buying Price Factor (1a)")
+        plt.grid(True, ls="--", alpha=0.6)
+        plt.tight_layout()
+        plt.show()
+
+    @staticmethod
     def plot_hourly_energy_flows_scenarios_1a(results_list: List[Dict[str, Any]], labels: List[str] | None = None) -> None:
         if labels is None:
             labels = [f"GE={r['GE']}" for r in results_list]

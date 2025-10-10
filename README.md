@@ -10,10 +10,11 @@ This is the repository for Group 40 for the first Assignment for Optimisation in
 2. Run from the project root:
    ```bash
    python main.py
-3. 
+3. Please note: 
 
 ### Code Structure
 
+```bash
 project_root/
 │
 ├── main.py                       # Entry point for running experiments
@@ -41,8 +42,9 @@ project_root/
 │
 ├── LICENSE
 └── README.md
+```
 
-## Input Data Structure
+### Input Data Structure
 
 The repositories include base datasets under the `data/question_name` directories, organized as follows:
 

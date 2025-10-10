@@ -31,17 +31,26 @@ if __name__ == "__main__":
     base_results = run_optimization_1a()
     print_results(base_results, model="1a")
     DataVisualizer.plot_hourly_energy_flows_base_1a(base_results)
+
+    # GE Sensitivity analysis 
     results_sweep = run_export_tariff_sweep(0.0, 2.6, 0.05)
     DataVisualizer.plot_hourly_energy_flows_scenarios_1a(results_sweep)
+
+    # Buying price Sensitivity analysis
+    results_buying = run_buying_price_sweep()
+    DataVisualizer.plot_buying_price_sweep_1a(results_buying)
 
     # --- Model 1b ---
     results_1b = run_optimization_1b()
     print_results(results_1b, model="1b")
     DataVisualizer.plot_hourly_energy_flows_1b(results_1b)
+
+    # Omega and tolerance Sensitivity analysis
     results_sweep_1b = sweep_1b()
     DataVisualizer.plot_sweep_1b(results_sweep_1b)
 
     # --- Model 1c ---
+
     # Base case 
     results_1c = run_optimization_1c(lambda_discomfort=1.5)
     print_results(results_1c, model="1c")

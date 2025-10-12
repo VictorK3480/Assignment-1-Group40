@@ -81,6 +81,8 @@ The repositories include base datasets under the `data/question_name` directorie
         - `max_discharging_power_ratio`: Maximum discharging power as a fraction of storage capacity per hour (unitless, 0–1)
         - `charging_efficiency`: Fraction of energy retained during charging (unitless, 0–1)
         - `discharging_efficiency`: Fraction of energy retained during discharging (unitless, 0–1)
+        - `battery_lifetime_yrs`: Given lifetime of battery in years (10)
+        - `battery_cost_per_kWh`: Cost of battery per kWh battery capacity (set to 1 as standard)
 
 **Note:** All ratios are relative to the respective appliance's maximum capacity or power. Units are indicated in parentheses.
     

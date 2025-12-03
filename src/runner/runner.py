@@ -11,6 +11,7 @@ from src.opt_model.opt_model import (
     sweep_buying_factor_1c,
     sweep_omega_1c,
     sweep_tolerance_1c,
+    sweep_omega_2b,
 )
 
 
@@ -319,3 +320,69 @@ def run_optimization_2b(lambda_discomfort: float = 1.5) -> Dict[str, Any]:
     opt = OptimizationModel2b(params)
     opt.run()
     return opt.results
+
+def run_omega_sweep_2b(GE: float = 0.4, steps: int = 20) -> List[Dict[str, Any]]:
+    """Sweep omega between 0 and 3 (inclusive) with given steps."""
+    omegas = np.linspace(1.5, 3, steps)
+    results_all: List[Dict[str, Any]] = []
+    for om in omegas:
+        res = sweep_omega_2b(lambda_discomfort=float(om), GE=GE)
+        res["omega"] = float(om)
+        results_all.append(res)
+    return results_all
+
+def sweep_battery_cost(lambda_discomfort: float, GE: float = 0.4,
+                       min_cost: float = 0.12, max_cost: float = 1, steps: int = 20):
+    """Sweep battery cost per kWh and record scaling + objective."""
+    loader = DataLoader2b()
+    DER_prod = loader.load_der_production()
+    app_params = loader.load_appliance_params()
+    bus_params = loader.load_bus_params()
+    usage = loader.load_usage_preferences()
+
+    hours = range(len(DER_prod))
+    PV_capacity = app_params["DER"][0]["max_power_kW"]
+    pv = {i: PV_capacity * DER_prod[i] for i in hours}
+    b = {i: bus_params["energy_price_DKK_per_kWh"][i] for i in hours}
+    s = b.copy()
+    GI = bus_params["import_tariff_DKK/kWh"]
+
+    ratios = usage["load_preferences"][0]["hourly_profile_ratio"]
+    d_hour = app_params["load"][0]["max_load_kWh_per_hour"]
+    ref_load = {i: d_hour * ratios[i] for i in hours}
+
+    storage = app_params["storage"]
+    prefs = usage["storage_preferences"]
+
+    costs = np.linspace(min_cost, max_cost, steps)
+    results = []
+
+    for cost in costs:
+        # override battery cost
+        storage[0]["battery_cost_per_kWh"] = cost  
+
+        params = {
+            "hours": hours,
+            "pv": pv,
+            "b": b,
+            "s": s,
+            "GE": GE,
+            "GI": GI,
+            "ref_load": ref_load,
+            "d_hour": d_hour,
+            "lambda_discomfort": lambda_discomfort,
+            "storage": storage,
+            "storage_preferences": prefs,
+        }
+
+        model = OptimizationModel2b(params)
+        model.run()
+        res = model.results.copy()
+        res["battery_cost_per_kWh"] = cost
+        results.append(res)
+        if "battery_scale" not in res:
+            print(f"⚠️  Warning: no solution for cost={cost}, status={res.get('status')}")
+
+
+    return results
+
